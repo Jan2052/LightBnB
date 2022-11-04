@@ -9,7 +9,7 @@ const pool = new Pool({
   database: 'lightbnb'
 });
 
-pool.query(`SELECT title FROM properties LIMIT 10;`).then(response => { console.log(response) })
+// pool.query(`SELECT title FROM properties LIMIT 10;`).then(response => { console.log(response) })
 
 /// Users
 
@@ -43,8 +43,7 @@ exports.getUserWithId = getUserWithId;
  * @return {Promise<{}>} A promise to the user.
  */
 const addUser = function (user) {
-  return pool
-    .query(`
+  return pool.query(`
     INSERT INTO users (name, email, password)
     VALUES ($1, $2, $3)
     RETURNING *;`, [user.name, user.email, user.password])
@@ -63,7 +62,20 @@ exports.addUser = addUser;
  * @return {Promise<[{}]>} A promise to the reservations.
  */
 const getAllReservations = function (guest_id, limit = 10) {
-  return getAllProperties(null, 2);
+  return pool.query(`
+  SELECT r.*, p.*, p.cost_per_night, r.start_date, AVG(pr.rating) as average_rating
+  FROM reservations r
+  JOIN properties p ON p.id = r.property_id
+  JOIN property_reviews pr ON r.id = pr.reservation_id
+  WHERE r.guest_id = $1
+  GROUP BY r.id, p.id
+  ORDER BY r.start_date
+  LIMIT $2;`, [guest_id, limit])
+    .then(res => res.rows)
+    .catch((err) => {
+      console.log("getAllReservation ERROR", err.message);
+    })
+  // return getAllProperties(null, 2);
 }
 exports.getAllReservations = getAllReservations;
 
@@ -75,14 +87,7 @@ exports.getAllReservations = getAllReservations;
  * @param {*} limit The number of results to return.
  * @return {Promise<[{}]>}  A promise to the properties.
  */
-// const getAllProperties = function(options, limit = 10) {
-//   const limitedProperties = {};
-//   for (let i = 1; i <= limit; i++) {
-//     limitedProperties[i] = properties[i];
-//   }
-//   return Promise.resolve(limitedProperties);
-// }
-// exports.getAllProperties = getAllProperties;
+
 
 const getAllProperties = (options, limit = 10) => {
   return pool
